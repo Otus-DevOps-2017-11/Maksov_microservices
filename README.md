@@ -6,7 +6,7 @@
 
 ```
 docker version
-docker run hello world - Запуск контейнера из образа
+docker run hello-world - Запуск контейнера из образа
 docker ps - Список запущенных контейнеров
 docker images - Список образов
 docker run -it ubuntu:16.04 /bin/bash
