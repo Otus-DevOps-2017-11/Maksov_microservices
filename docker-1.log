@@ -1,0 +1,8 @@
+REPOSITORY               TAG                 IMAGE ID            CREATED             SIZE
+maksov/ubuntu-tmp-file   latest              47adcdc70a4c        22 seconds ago      112MB
+ubuntu                   16.04               0458a4468cbc        3 hours ago         112MB
+hello-world              latest              f2a91732366c        2 months ago        1.85kB
+
+
+Выводы команд docker inspect <u_container_id> и docker inspect <u_image_id> отличаются так как команда возвращает низкоуровневую информацию об объектах Docker. 
+В первом случае выводим информацию о контейнере. Во втором об образе.  
