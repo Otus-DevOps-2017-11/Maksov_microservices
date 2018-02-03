@@ -150,6 +150,8 @@ COPY . /app
 CMD ["puma"]
 ```
 Размер образа - 42.7 Мб
+
+[docker images](https://prnt.sc/i9q44j)
 ### Запуск контейнеров
 ---
 ```
@@ -168,6 +170,7 @@ docker run -d --network=reddit --network-alias=microservice_post --env POST_DATA
 docker run -d --network=reddit --network-alias=microservice_comment --env COMMENT_DATABASE_HOST=microservice_comment_db maksov/comment:2.0
 docker run -d --network=reddit -p 9292:9292 --env COMMENT_SERVICE_HOST=microservice_comment --env POST_SERVICE_HOST=microservice_post maksov/ui:3.0
 ```
+
 ### Задание со * Сборка Alpine Linux + (код описан выше)
 
 ### Способы по уменьшению +
@@ -183,3 +186,7 @@ Multistage не знаю на сколько оптимален в данном 
 docker volume create reddit_db
 docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db -v reddit_db:/data/db mongo:latest
 ```
+
+[docker ps](https://prnt.sc/i9qta1)
+
+[Microservices_Reddit](http://35.195.99.53:9292/)
