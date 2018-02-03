@@ -1,0 +1,11 @@
+FROM maksov/ruby-reddit:1.0
+
+ENV POST_SERVICE_HOST post \
+    POST_SERVICE_PORT 5000 \
+    COMMENT_SERVICE_HOST comment \
+    COMMENT_SERVICE_PORT 9292
+
+WORKDIR /app
+COPY . /app
+
+CMD ["puma"]
