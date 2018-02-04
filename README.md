@@ -188,5 +188,3 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 ```
 
 [docker ps](https://prnt.sc/i9qta1)
-
-[Microservices_Reddit](http://35.195.99.53:9292/)
