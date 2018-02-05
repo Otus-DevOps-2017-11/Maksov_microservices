@@ -192,3 +192,120 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 ### Ответ на вопросы:
 ---
 Ask: Cборка ui началась не с первого шага. Почему? Answ: 1 шаг скачивание образа. Образ Ruby остался в кэше с предыдущего действия по build сервиса Comment.
+
+## Docker: сети, docker-compose
+
+Ход работы
+
+Запуск контейнера с None network driver
+
+```
+docker run --network none --rm -d --name net_test joffotron/docker-net-tools -c "sleep 100"
+
+docker exec -ti net_test
+```
+
+Запуск контейнера с Host network driver
+```
+docker run --network host --rm -d --name net_test joffotron/docker-net-tools -c "sleep 100"
+
+docker exec -ti net_test ifconfig
+docker-machine ssh docker-host ifconfig
+? Сравнить вывод команд: драйвер дает контейнеру доступ к собственному пространству хоста
+
+```
+
+```
+docker run --network host -d nginx
+
+При повторном запуске nginx пытается забиндится к адрессу 0.0.0.0:80. Но ошибка - Address already in use
+
+```
+
+Docker networks
+
+```
+ sudo ln -s /var/run/docker/netns /var/run/netns
+
+ sudo ip netns
+
+ Посмотреть как меняется список Namespace
+
+ ip netns exec namespace command -  позволит выполнить команды в выбранном namespace
+
+ При запуске с Host network driver  контейнер запускается с net-namespace default (Хост)
+
+  При запуске с None network driver  контейнер запускается с новым net-namespace
+
+```
+
+Bridge network driver
+
+```
+docker-machine ssh docker-host
+sudo apt-get update && sudo apt-get install  bridge-utils
+docker network ls - спсиок созданных сетей
+ifconfig | grep br - список bridge-интерфейсов
+
+```
+
+```
+sudo iptables -nL -t nat (флаг -v даст чуть больше инфы)
+```
+
+```
+docker run -d --network=front_net -p 9292:9292 --name ui maksov/ui:3.0
+docker run -d --network=back_net --name comment maksov/comment:2.0
+docker run -d --network=back_net --name post maksov/post:1.0
+docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+
+Коннект сетей к контейнеру
+> docker network connect front_net post
+> docker network connect front_net comment
+
+root     11488  0.0  0.1 108312  2680 ?        Sl   16:14   0:00 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
+```
+
+### Docker-compose
+---
+1) Для реализации кейса с множеством сетей, сетевых алиасов в секции composefile были определены сети и прописаны настройки сетей с типом драйвера bridge, а также определены подсети. Aliases определены в каждома сервисе
+```
+example
+
+services:
+  post_db:
+    networks:
+      back_net:
+        aliases:
+          - post_db
+          - comment_db
+
+networks:
+  front_net:
+    driver: bridge
+      ipam:
+        driver: default
+        config:
+          - subnet: 10.0.1.0/24
+```
+2) Параметризированы:
+- порт публикации сервиса ui. Порт контейнера не стал параметризировать, т.к. его открыли в задали при запуске образа точно на 9292. хотя и его можно поменять конечно. но тогда и переменную COMMENT_SERVICE_PORT при запуске менять необходимо.
+- тэги сервисов
+- имя проекта (к вопросу как его можно менять, изначально оно определяется по имени папки, в котором располагается файл)
+- имя пользователя на hub docker
+- имя докер файла для билда
+- также в файл был добавлен параметр depend_on для определения порядка запуска сервисов
+
+### Задание со * Docker-compose override
+---
+
+Может конкретно для этого задания можно было просто монтированием папок на хосте выполнить, предварительно скопировав.
+
+Но решил попробовать контейнерезацией данных. Идея была в том, что доставлять контейнер с кодом можно на множество одинаковых сервисов (в случае балансировки). Может конечно есть более оптимальное решение по типу storage-driver и хранение кода в облаке или в одном из поддерживаемых внешних хранилищ.
+
+В итоге для каждого микросервиса собираю образ from scratch И в docker-compose.override.yml  монтирую каталоги к volumes и volumes монтирую уже к микросервисам.
+
+Для проверки поменял немного view сервиса ui.
+
+Для истории knowledge: возникла проблема запуска контейнера со сылк на невозможности запустить команду, т.к. не найден исполняемый путь. А также ошибки docker-compose получения объекта.
+Решение: 1. Удалить volume с неправильной точкой монтирования. 2. Удалить контейнер.
