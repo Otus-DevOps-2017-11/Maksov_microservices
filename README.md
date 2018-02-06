@@ -193,7 +193,8 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 ---
 Ask: Cборка ui началась не с первого шага. Почему? Answ: 1 шаг скачивание образа. Образ Ruby остался в кэше с предыдущего действия по build сервиса Comment.
 
-## Docker: сети, docker-compose
+## Домашняя работа № 17  Docker: сети, docker-compose
+---
 
 Ход работы
 
