@@ -19,10 +19,10 @@ build_job:
     
 test_unit_job:
   stage: test
-    services:
-      - mongo:latest
-    script:
-      - ruby simpletest.rb
+  services:
+    - mongo:latest
+  script:
+    - ruby simpletest.rb
     
 test_integration_job:
   stage: test
