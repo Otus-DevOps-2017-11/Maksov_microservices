@@ -1,7 +1,8 @@
 FROM python:3.6.0-alpine
 
-ENV POST_DATABASE_HOST post_db
-ENV POST_DATABASE posts
+ENV POST_DATABASE_HOST post_db 
+ENV    POST_DATABASE posts
+
 WORKDIR /app
 COPY . /app
 
