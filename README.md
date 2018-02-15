@@ -410,7 +410,8 @@ deploy_job:
 
 #### Задание со * Gitlab Runner Autoscaling
 
-Крутое задание. В принципе сразу было очевидно, что необходимо использовать данный способ. Но в плане настройки та еще запара. Хотя уже после настройки понятно, что довольно стандартно. Только четко и последовательно необходимо было выполнять.
+Крутое задание. В принципе сразу было очевидно, что необходимо использовать данный способ. Но в плане настройки та еще запара. Хотя уже после настройки понятно, что довольно стандартно. Только четко и последовательно необходимо было выполнять. + ждем kubernetes, чтоб запробовать))
+Машинки создаются(создал 3), потом по IdleTime удаляются.
 
 Autoscaling предоставляет возможность использовтаь ресурсы более гибко и динамично.
 
@@ -495,8 +496,9 @@ concurrent = 4 #Limits how many jobs globally can be run concurrently.   All reg
       "google-machine-type=g1-small",
       "google-machine-image=ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20180126",
       "google-tags=default-allow-ssh",
-      "google-zone=europe-west1-d"
-      "google-use-internal-ip = True # It’s useful for managing docker machines from another machine on the same network, such as when deploying swarm.
+      "google-zone=europe-west1-d",
+      "google-use-internal-ip = True, # It’s useful for managing docker machines from another machine on the same network, such as when deploying swarm.
+      "engine-registry-mirror=http://MY_REGISTRY_IP:6000"
     ]
 
 ```
