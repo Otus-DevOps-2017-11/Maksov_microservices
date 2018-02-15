@@ -16,7 +16,7 @@ build_job:
   stage: build
   script:
     - echo 'Building'
-    
+        
 test_unit_job:
   stage: test
   services:
@@ -29,8 +29,9 @@ test_integration_job:
   script:
     - echo 'Testing 2'
 
-
 deploy_job:
   stage: deploy
   script:
     - echo 'Deploy'
+
+  
