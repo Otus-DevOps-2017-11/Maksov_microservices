@@ -315,12 +315,19 @@ networks:
 
 Ход работы
 
-### Создание виртуальной машины
+### Создание виртуальной машины на GCE
 
 ```
 Docker-machine
 
-docker-machine create --drive google 
+docker-machine create --drive google \
+--google-zone europe-west1-b \
+--google-zone europe-west1-b \
+--google-machine-type g1-small \
+--google-disk-type pd-standart \
+--google-disk-size 100Gb \
+--google-machine-image $(gcloud compute images list --filter ubuntu-1604-lts --uri) \
+gitlab-runner
 
 ```
 
