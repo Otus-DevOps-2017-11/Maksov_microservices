@@ -312,3 +312,232 @@ networks:
 
 Для истории knowledge: возникла проблема запуска контейнера со сылк на невозможности запустить команду, т.к. не найден исполняемый путь. А также ошибки docker-compose получения объекта.
 Решение: 1. Удалить volume с неправильной точкой монтирования. 2. Удалить контейнер.
+
+## Домашняя работа № 19. Устройство  Gitlab CI. Построение процесса непрерывной интеграции.
+
+Ход работы
+
+### Создание виртуальной машины на GCE
+
+```
+Docker-machine
+
+docker-machine create --drive google \
+--google-zone europe-west1-b \
+--google-zone europe-west1-b \
+--google-machine-type g1-small \
+--google-disk-type pd-standart \
+--google-disk-size 100Gb \
+--google-machine-image $(gcloud compute images list --filter ubuntu-1604-lts --uri) \
+gitlab-runner
+
+```
+
+#### Docker-compose
+
+```
+web:
+ image: 'gitlab/gitlab-ce:latest'
+ restart: always
+ hostname: 'gitlab.example.com'
+ environment:
+ GITLAB_OMNIBUS_CONFIG: |
+ external_url 'http://http://35.189.219.174'
+ ports:
+  - '80:80'
+  - '443:443'
+  - '2222:22'
+ volumes:
+  - '/srv/gitlab/config:/etc/gitlab'
+  - '/srv/gitlab/logs:/var/log/gitlab'
+  - ‘/srv/gitlab/data:/var/opt/gitlab'
+
+docker-compose up -d
+```
+
+#### GITLAB_RUNNER
+
+```
+docker run -d --name gitlab-runner --restart always \
+  -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  gitlab/gitlab-runner:latest 
+
+root@gitlab-ci:~# docker exec -it gitlab-runner gitlab-runner register
+Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/):
+http://<YOUR-VM-IP>/
+Please enter the gitlab-ci token for this runner:
+<TOKEN>
+Please enter the gitlab-ci description for this runner:
+[38689f5588fe]: my-runner
+Please enter the gitlab-ci tags for this runner (comma separated):
+linux,xenial,ubuntu,docker
+Whether to run untagged builds [true/false]:
+[false]: true
+Whether to lock the Runner to current project [true/false]:
+[true]: false
+Please enter the executor:
+docker
+Please enter the default Docker image (e.g. ruby:2.1):
+alpine:latest
+Runner registered successfully.
+```
+
+```
+stages:
+ - build
+ - test
+ - deploy
+
+variables:
+ DATABASE_URL: 'mongodb://mongo/user_posts'
+
+before_script:
+ - cd reddit
+ - bundle install 
+
+build_job:
+ stage: build
+ script:
+ - echo 'Building'
+
+test_unit_job:
+ stage: test
+ script:
+ - echo 'Testing 1'
+
+test_integration_job:
+ stage: test
+ script:
+ - echo 'Testing 2'
+
+deploy_job:
+ stage: deploy
+ script:
+ - echo 'Deploy'
+```
+
+#### Задание со * Gitlab Runner Autoscaling
+
+Крутое задание. В принципе сразу было очевидно, что необходимо использовать данный способ. Но в плане настройки та еще запара. Хотя уже после настройки понятно, что довольно стандартно. Только четко и последовательно необходимо было выполнять. + ждем kubernetes, чтоб запробовать))
+Машинки создаются(создал 3), потом по IdleTime удаляются.
+
+Autoscaling предоставляет возможность использовтаь ресурсы более гибко и динамично.
+
+При Autoscaling runners инфраструктура содержит столько build instances, сколько необходимо на текущий момент.
+
+Предварительные подготовка Docker Regisrty и Cache Server
+
+Дополним docker-compose
+
+```
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+       external_url 'http://35.189.219.174'
+      # Add any other gitlab.rb configuration here, each on its own line
+  ports:
+    - '80:80'
+    - '443:443'
+    - '23:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+    
+registry:
+  image: registry:2
+  restart: always
+  environment:
+    REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+  ports:
+    - '6000:5000'
+
+# не забыть создать bucket в export
+# AccessKey и SecretKey в 
+cache:
+  image: minio/minio:latest
+  restart: always
+  ports:
+    - '9005:9000'
+  volumes:
+    - '/srv/cache/.minio:/root/.minio'
+    - '/srv/cache/export:/export'
+  command: ["server", "/export"]
+    
+runner:
+  image: 'gitlab/gitlab-runner:latest'
+  restart: always
+  environment:
+    - GOOGLE_APPLICATION_CREDENTIALS=/etc/gitlab-runner/docker.json
+  volumes:
+    - '/srv/gitlab-runner/config:/etc/gitlab-runner'
+
+```
+
+```
+concurrent = 4 #Limits how many jobs globally can be run concurrently.   All registered Runners can run up to 50 concurrent builds
+
+[[runners]]
+  url = "http://35.189.219.174"
+  token = "PRIVATE_TOKEN"
+  name = "build-runner"
+  executor = "docker+machine"
+  [runners.docker]
+    image = "alpine:latest"
+  [runners.cache]
+    Type = "s3"
+    ServerAddress = "http://GITLAB-IP:9005"
+    AccessKey = "AccessKey"
+    SecretKey = "SecretKey"
+    BucketName = "runner"
+    Insecure = true #if the s3 service is available by HTTP
+  [runners.machine]
+    IdleCount = 0
+    IdleTime = 200
+    MachineDriver = "google"
+    MachineName = "gitlab-runner-%s"
+    MachineOptions = [
+      "google-project = project_name",
+      "google-machine-type=g1-small",
+      "google-machine-image=ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20180126",
+      "google-tags=default-allow-ssh",
+      "google-zone=europe-west1-d",
+      "google-use-internal-ip = True, # It’s useful for managing docker machines from another machine on the same network, such as when deploying swarm.
+      "engine-registry-mirror=http://MY_REGISTRY_IP:6000"
+    ]
+
+```
+
+Дополнительные параметры
+
+limit = 10 - # (build+IdleCount) This Runner can execute up to 10 builds (created machines)
+
+IdleCount = 5  # There must be 5 machines in Idle state - when Off Peak time mode is off
+
+
+
+#### *Настройка в Slack
+
+Все стандратно.
+В Slack создали incoming-webhook
+В Gitlab Project Setiing>Integretions->Slack notofications добавили URL Slack incoming webhook
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
