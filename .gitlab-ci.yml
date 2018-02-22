@@ -1,37 +1,127 @@
-image: ruby:2.4.2
+image: docker:latest
+
+services:
+  - docker:dind
 
 stages:
-  - build
   - test
-  - deploy
+  - build
+  - review
+  - stage
+  - production
 
 variables:
-     DATABASE_URL: 'mongodb://mongo/user/user_posts'
-
-before_script:
-  - cd reddit
-  - bundle install
+    DOCKER_CERTS: certs
+    DATABASE_URL: 'mongodb://mongo/user'
+    DOCKER_REPO: 'maksov/reddit'
+    DOCKER_IMAGE_HUB: "${DOCKER_REPO}:${CI_COMMIT_REF_SLUG}"
+    GCE_PROJECT_ID: 'docker-193409'
+    GCE_IMAGE_PATH: 'ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20180126'
+    GCE_ZONE: 'europe-west1-d'
+    GITLAB_URL: 'http://35.189.219.174/'
+    GOOGLE_APPLICATION_CREDENTIALS: docker.json
+    VM_NAME: ${CI_COMMIT_REF_SLUG}
+      
+test_unit_job:
+  image: ruby:2.4.2
+  stage: test
+  script:
+    - cd reddit
+    - bundle install 
+    - ruby simpletest.rb
+   
+test_integration_job:
+  image: ruby:2.4.2
+  stage: test
+  script:
+    - env
+    - ls
+    - ls /
+    - pwd
 
 build_job:
+  image: 
   stage: build
   script:
-    - echo 'Building'
-        
-test_unit_job:
-  stage: test
-  services:
-    - mongo:latest
-  script:
-    - ruby simpletest.rb
-    
-test_integration_job:
-  stage: test
-  script:
-    - echo 'Testing 2'
+    - docker build -t reddit:latest ./reddit
+    - commit=$(echo ${CI_COMMIT_SHA} | sed -e 's/^\(.\{8\}\).*/\1/') 
+    - DOCKER_IMAGE_HUB=${DOCKER_IMAGE_HUB}-${commit}
+    - echo ${DOCKER_IMAGE_HUB}
+    - docker tag reddit:latest ${DOCKER_IMAGE_HUB}
+    - docker login -u maksov -p ${DOCKER_HUB_PASS}
+    - docker push ${DOCKER_IMAGE_HUB}
 
-deploy_job:
-  stage: deploy
+branch_review:
+  cache:
+    key: "$CI_JOB_STAGE"
+    untracked: true
+  stage: review
+  script: 
+    - echo "Deploy to" ${CI_ENVIRONMENT_SLUG}
+    - echo ${GCE_FILE} > docker.json
+    - apk update &&  apk add ca-certificates curl py-pip
+    - curl -s -L https://github.com/docker/machine/releases/download/v0.13.0/docker-machine-`uname -s`-`uname -m` > /tmp/docker-machine
+    - install /tmp/docker-machine docker-machine
+    - docker network ls
+    - ./docker-machine version
+    - ./docker-machine -s ${DOCKER_CERTS} status ${VM_NAME} || ./docker-machine -s ${DOCKER_CERTS} create --driver google --google-project ${GCE_PROJECT_ID} 
+      --google-zone europe-west1-d --google-machine-type g1-small
+      --google-tags default-allow-http
+      --google-machine-image ${GCE_IMAGE_PATH}
+      ${VM_NAME}
+    - ./docker-machine -s ${DOCKER_CERTS} ls
+    - CI_ENVIRONMENT_URL=http://$(./docker-machine -s ${DOCKER_CERTS} ip ${VM_NAME})
+    - ./docker-machine -s ${DOCKER_CERTS} env --shell sh ${VM_NAME}
+    - eval $(./docker-machine -s ${DOCKER_CERTS} env --shell sh ${VM_NAME})
+    - commit=$(echo ${CI_COMMIT_SHA} | sed -e 's/^\(.\{8\}\).*/\1/') 
+    - DOCKER_IMAGE_HUB=${DOCKER_IMAGE_HUB}-${commit}
+    - docker network ls
+    - docker network prune -f
+    - docker network create reddit
+    - docker run -d  --network=reddit --network-alias=mongo_db mongo:3.2 
+    - docker run -d --network=reddit --env DATABASE_URL=mongo_db -p 80:9292 ${DOCKER_IMAGE_HUB} 
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    url: ${CI_ENVIRONMENT_URL}
+    on_stop: stop_review_app
+  only:
+    - branches
+  except:
+    - master
+
+stop_review_app:
+  image: bodymindarts/docker-machine-setup:latest
+  stage: review
+  script: 
+    - docker-machine -s ${DOCKER_CERTS} ls
+    - docker-machine -s ${DOCKER_CERTS} rm -y
+  when: manual
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    action: stop
+
+stage:
+  stage: stage
+  when: manual
+  only:
+    - /^\d+\.\d+.\d+/
   script:
     - echo 'Deploy'
-
+  environment:
+    name: stage
+    url: https://beta.example.com 
   
+production:
+  stage: production
+  when: manual
+  only:
+    - /^\d+\.\d+.\d+/
+  script:
+    - echo 'Deploy production'
+  environment:
+    name: production
+    url: https://example.com
+
+
+
+

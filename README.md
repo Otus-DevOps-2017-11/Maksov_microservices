@@ -525,6 +525,126 @@ IdleCount = 5  # There must be 5 machines in Idle state - when Off Peak time mod
 В Gitlab Project Setiing>Integretions->Slack notofications добавили URL Slack incoming webhook
 
 
+## Домашняя работа № 20. Устройство  Gitlab CI. Построение процесса непрерывной интеграции.
+
+
+###  Описание окружения
+
+```
+deploy_dev_job:
+ stage: review
+ script:
+ - echo 'Deploy'
+ environment:
+ name: dev
+ url: http://dev.example.com
+
+```
+
+### Ручной запуск окружения
+
+```
+ stage: stage
+ when: manual
+ script:
+ - echo 'Deploy'
+ environment:
+ name: stage
+ url: https://beta.example.com 
+
+```
+### Условия и ограничения
+```
+stage:
+ stage: stage
+ when: manual
+ only:
+ - /^\d+\.\d+.\d+/
+ script:
+ - echo 'Deploy'
+ environment:
+ name: stage
+ url: https://beta.example.com 
+
+```
+
+### Динамические окружения
+
+```
+branch review:
+ stage: review
+ script: echo "Deploy to $CI_ENVIRONMENT_SLUG"
+ environment:
+ name: branch/$CI_COMMIT_REF_NAME
+ url: http://$CI_ENVIRONMENT_SLUG.example.com
+ only:
+ - branches
+ except:
+ - master 
+```
+
+Задания со *
+
+
+Сборка образа
+
+```
+build_job:
+  image: 
+  stage: build
+  script:
+    - docker build -t reddit:latest ./reddit
+    - commit=$(echo ${CI_COMMIT_SHA} | sed -e 's/^\(.\{8\}\).*/\1/') 
+    - DOCKER_IMAGE_HUB=${DOCKER_IMAGE_HUB}-${commit}
+    - echo ${DOCKER_IMAGE_HUB}
+    - docker tag reddit:latest ${DOCKER_IMAGE_HUB}
+    - docker login -u maksov -p Pilotka21
+    - docker push ${DOCKER_IMAGE_HUB}
+```
+
+Создание и деплой в одном db
+
+```
+branch_review:
+  cache:
+    untracked: true
+    key: ${CI_BUILD_REF_NAME}
+    paths:
+      - cache/docker
+  stage: review
+  script: 
+    - echo "Deploy to" ${CI_ENVIRONMENT_SLUG}
+    - echo ${GCE_FILE} > docker.json
+    - apk update &&  apk add ca-certificates curl py-pip
+    - curl -s -L https://github.com/docker/machine/releases/download/v0.13.0/docker-machine-`uname -s`-`uname -m` > /tmp/docker-machine
+    - install /tmp/docker-machine docker-machine
+    - pip install docker-compose
+    - ./docker-machine version
+    - ./docker-machine -s ${CI_BUILD_REF_NAME} status ${VM_NAME} || ./docker-machine -s ${CI_BUILD_REF_NAME} create --driver google --google-project ${GCE_PROJECT_ID} 
+      --google-zone europe-west1-b --google-machine-type g1-small
+      --google-tags gitlab-deploy-agent
+      --google-machine-image ${GCE_IMAGE_PATH}
+      ${VM_NAME}
+    - ./docker-machine -s ${CI_BUILD_REF_NAME} ls
+    - CI_ENVIRONMENT_URL=http://$(./docker-machine -s ${CI_BUILD_REF_NAME} ip ${VM_NAME})
+    - ./docker-machine -s ${CI_BUILD_REF_NAME} env --shell sh ${VM_NAME}
+    - eval $(./docker-machine -s CERT_PATH env --shell sh ${VM_NAME})
+    - docker ps
+    - commit=$(echo ${CI_COMMIT_SHA} | sed -e 's/^\(.\{8\}\).*/\1/') 
+    - DOCKER_IMAGE_HUB=${DOCKER_IMAGE_HUB}-${commit}
+    - docker network create reddit
+    - docker run -d  --network=reddit --network-alias=mongo_db mongo:3.2 
+    - docker run -d --network=reddit -p 80:9292 ${DOCKER_IMAGE_HUB} --env DATABASE_URL=mongo_db
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    on_stop: stop_review_app
+  only:
+    - branches
+  except:
+    - master
+```
+
+
 
 
 
