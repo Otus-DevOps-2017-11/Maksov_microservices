@@ -525,7 +525,7 @@ IdleCount = 5  # There must be 5 machines in Idle state - when Off Peak time mod
 В Gitlab Project Setiing>Integretions->Slack notofications добавили URL Slack incoming webhook
 
 
-## Домашняя работа № 20. Устройство  Gitlab CI. Построение процесса непрерывной интеграции.
+## Домашняя работа № 20. Устройство Gitlab CI. Непрерывная поставка
 
 
 ###  Описание окружения
