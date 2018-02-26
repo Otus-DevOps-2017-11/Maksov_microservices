@@ -644,6 +644,67 @@ branch_review:
     - master
 ```
 
+## HW21 Введение в мониторинг. Системы мониторинга.
+
+### План 
+
+ - prometheus: запуск, конфигурация, знакомство с Web UI
+ - мониторинг состояния микросервисов
+ - сбор метрик хоста с использованием экспортера
+
+#### Откроем порты 
+
+- gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+
+- gcloud compute firewall-rules create puma-default --allow tcp:9292
+
+#### Создадим машинку 
+
+```
+docker-machine create --driver google --google-machine-image  https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/
+global/images/family/ubuntu-1604-lts --google-machine-type n1-standart-1 vm1
+
+eval $(docker-machine env vm1)
+```
+
+#### Запуск системы мониторинга Prometheus
+
+```
+docker run --rm -p 9090:9090 -d --name prometheus prom/prometheus:v2.1.0
+
+docker ps
+
+docker-machine ip vm1
+```
+
+#### Результат вывода 
+
+```
+prometheus_build_info{branch="HEAD",goversion="go1.9.1",instanc
+e="localhost:9090", job="prometheus", revision=
+"3a7c51ab70fc7615cd318204d3aa7c078b7c5b20",version="1.8.1"} 1
+```
+
+#### Docker образ
+
+```
+monitoring/prometheus/Dockerfile
+FROM prom/prometheus:v2.1.0
+ADD prometheus.yml /etc/prometheus/
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
