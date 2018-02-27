@@ -11,10 +11,8 @@ services:
         aliases:
           - post_db
           - comment_db
+  
   ui:
-    build:
-      context: ./ui
-      dockerfile: ${Dockerfile_ui}
     image: ${DOCKER_HUB_USERNAME}/ui:${UI_TAG}
     ports:
       - ${UI_PORT_HOST}:9292/tcp
@@ -25,9 +23,6 @@ services:
       - comment
 
   post:
-    build:
-      context: ./post-py
-      dockerfile: ${Dockerfile_post}
     image: ${DOCKER_HUB_USERNAME}/post:${POST_TAG}
     networks:
       back_net:
@@ -38,9 +33,6 @@ services:
       - post_db
 
   comment:
-    build:
-      context: ./comment
-      dockerfile: ${Dockerfile_comment}
     image: ${DOCKER_HUB_USERNAME}/comment:${COMMENT_TAG}
     networks:
       front_net:
@@ -49,9 +41,24 @@ services:
       back_net:
     depends_on:
       - post_db
+  prometheus:
+    image: ${DOCKER_HUB_USERNAME}/prometheus
+    networks:
+      back_net:
+      front_net:
+    ports:
+        - '9090:9090'
+    volumes:
+        - prometheus_data:/prometheus
+    command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention=1d'
 #Volumes
 volumes:
   post_db:
+  prometheus_data:
+  
 #Networks
 networks:
   front_net:
