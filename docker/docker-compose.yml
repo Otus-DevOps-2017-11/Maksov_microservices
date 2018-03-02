@@ -41,6 +41,7 @@ services:
       back_net:
     depends_on:
       - post_db
+  
   prometheus:
     image: ${DOCKER_HUB_USERNAME}/prometheus
     networks:
@@ -73,3 +74,5 @@ networks:
           driver: default
           config:
             - subnet: 10.0.2.0/24
+            
+
