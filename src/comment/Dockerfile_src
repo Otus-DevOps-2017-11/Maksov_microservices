@@ -1,7 +1,0 @@
-FROM scratch
-
-
-WORKDIR /commentsrc
-COPY . /commentsrc
-
-CMD ["/commentsrc/hello"]

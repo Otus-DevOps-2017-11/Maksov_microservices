@@ -2,51 +2,11 @@ version: '3.3'
 
 #Sevices
 services:
-  post_db:
-    image: mongo:3.2
-    volumes:
-      - post_db:/data/db
-    networks:
-      back_net:
-        aliases:
-          - post_db
-          - comment_db
-  
-  ui:
-    image: ${DOCKER_HUB_USERNAME}/ui:${UI_TAG}
-    ports:
-      - ${UI_PORT_HOST}:9292/tcp
-    networks:
-      front_net:
-    depends_on:
-      - post
-      - comment
 
-  post:
-    image: ${DOCKER_HUB_USERNAME}/post:${POST_TAG}
-    networks:
-      back_net:
-      front_net:
-        aliases:
-          - post
-    depends_on:
-      - post_db
-
-  comment:
-    image: ${DOCKER_HUB_USERNAME}/comment:${COMMENT_TAG}
-    networks:
-      front_net:
-        aliases:
-          - comment
-      back_net:
-    depends_on:
-      - post_db
-  
   prometheus:
     image: ${DOCKER_HUB_USERNAME}/prometheus
     networks:
-      back_net:
-      front_net:
+      reddit:
     ports:
         - '9090:9090'
     volumes:
@@ -55,6 +15,47 @@ services:
         - '--config.file=/etc/prometheus/prometheus.yml'
         - '--storage.tsdb.path=/prometheus'
         - '--storage.tsdb.retention=1d'
+
+        
+  post_db:
+    image: mongo:3.2
+    volumes:
+      - post_db:/data/db
+    networks:
+      reddit:
+        aliases:
+          - post_db
+          - comment_db
+
+  post:
+    image: ${DOCKER_HUB_USERNAME}/post:${POST_TAG}
+    networks:
+      reddit:
+        aliases:
+          - post
+    depends_on:
+      - post_db
+
+  comment:
+    image: ${DOCKER_HUB_USERNAME}/comment:${COMMENT_TAG}
+    networks:
+      reddit:
+        aliases:
+          - comment
+    depends_on:
+      - post_db
+
+  ui:
+    image: ${DOCKER_HUB_USERNAME}/ui:${UI_TAG}
+    ports:
+      - ${UI_PORT_HOST}:9292/tcp
+    networks:
+        reddit:
+    depends_on:
+      - post
+      - comment
+  
+
 #Volumes
 volumes:
   post_db:
@@ -62,8 +63,7 @@ volumes:
   
 #Networks
 networks:
-  front_net:
-  back_net:
+  reddit:
 
             
 
