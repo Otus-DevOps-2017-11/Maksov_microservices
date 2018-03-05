@@ -1,7 +1,0 @@
-FROM scratch
-
-
-WORKDIR /uisrc
-COPY . /uisrc
-
-CMD ["/uisrc/hello"]
