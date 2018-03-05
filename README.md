@@ -694,6 +694,168 @@ ADD prometheus.yml /etc/prometheus/
 ```
 
 
+#### Конфигурация Prometheus
+
+```
+---
+
+global:
+  scrape_interval: '5s'
+
+scrape_configs:
+  
+  - job_name: 'prometheus'
+  static_configs:
+    -targets:
+      - 'localhost:9090'
+  
+  - job_name: 'ui'
+  static_configs:
+    -targets:
+      - 'ui:9292'
+
+  - job_name: 'comment'
+  static_configs:
+    - targets:
+      - 'comment:9292'
+
+```
+
+#### Образы микросервисов
+
+```
+for i in ui post-py comment; do cd src/$i; bash
+docker_build.sh; cd -; done
+```
+
+#### Docker-compose
+
+```
+services:
+...
+  prometheus:
+    image: ${USER_NAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+  volumes:
+    prometheus_data:
+```
+
+#### Сбор метрик хоста
+
+В ситуациях, когда не можем реализовать отдачу метрик Prometheus в коде приложения, мы можем использовать экспортер, который будет транслировать метрики приложения или системы в формате доступном для чтения Prometheus.
+
+Node-xporter для сбора информации о работе Docker хоста
+```
+services:
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command;
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+  ```
+
+Конфиг Prometheus
+```
+scrape_configs:
+...
+- job_name: 'node'
+  static_configs:
+    - targets:
+      - 'node-exporter:9100'
+```
+
+
+
+#### Задание со * MongoDB Exporter
+
+Использую готовый экспортер eses/mongodb_exporter:latest
+```
+mongodb-exporter:
+    image: eses/mongodb_exporter:latest
+    command: ["-mongodb.uri", "post_db"]
+    networks:
+      monitoring_net:
+```
+
+#### Задание со * Мониторинг сервисов с помощью Blackbox Exporter
+
+Тут решил собрать 
+
+```
+Сборка осуществляется по следующему пути $HOME/go/src/github.com/prometheus
+
+git clone https://github.com/prometheus/blackbox_exporter.git
+
+make
+```
+
+Конфиг Prometheus
+
+```
+ - job_name: 'blackbox'
+      metrics_path: /probe
+      params:
+        module: [http_2xx]
+      static_configs:
+        - targets:
+          - http://comment:9292/healthcheck
+          - http://post:5000/healthcheck
+          - http://ui:9292
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: blackbox-exporter:9115
+
+```
+
+
+Конфиг Docker Compose
+
+```
+blackbox-exporter:
+    image: ${DOCKER_HUB_USERNAME}/blackbox_exporter:latest
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    networks:
+      monitoring_net:
+
+```
+
+Дополнительно выделил в отдлебную сеть. Идею подсмотрел немного у andywow. Т.к. согласен, что мониторинг желательно вынести в отдедьную сеть. Но без алиасов. Все обращения по именам сервисов.
+
+#### Задание со * Makefile
+
+
+Сделан простейший топорный Makefile. К сожелению не хватает опыта.  Так кончено идеи есть что-нибудь униварсальное сделать. По типу указать директории по котрым должен проходить считывать список директорий (имена образов), а затем билдить образы.
+
+
+
+
+
+
+
+
+
+
+
 
 
 
