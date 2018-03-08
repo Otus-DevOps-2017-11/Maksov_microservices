@@ -1,0 +1,104 @@
+version: '3.3'
+
+#Sevices
+services:
+
+  prometheus:
+    image: ${DOCKER_HUB_USERNAME}/prometheus
+    networks:
+      monitoring_net:
+    ports:
+        - '9090:9090'
+    volumes:
+        - prometheus_data:/prometheus
+    command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention=1d'
+  
+  post_db:
+    image: mongo:3.2
+    volumes:
+      - post_db:/data/db
+    networks:
+      monitoring_net:
+      back_net:
+        aliases:
+          - post_db
+          - comment_db
+
+  post:
+    image: ${DOCKER_HUB_USERNAME}/post:${POST_TAG}
+    networks:
+      monitoring_net:
+      back_net:
+      front_net:
+        aliases:
+          - post
+    depends_on:
+      - post_db
+
+  comment:
+    container_name: comment
+    image: ${DOCKER_HUB_USERNAME}/comment:${COMMENT_TAG}
+    networks:
+      front_net:
+      back_net:
+      monitoring_net:
+    depends_on:
+      - post_db
+
+  ui:
+    image: ${DOCKER_HUB_USERNAME}/ui:${UI_TAG}
+    ports:
+      - ${UI_PORT_HOST}:9292/tcp
+    networks:
+        front_net:
+        monitoring_net:
+    depends_on:
+      - post
+      - comment
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+    networks:
+      monitoring_net:
+
+  mongodb-exporter:
+    image: eses/mongodb_exporter:latest
+    command: ["-mongodb.uri", "post_db"]
+    networks:
+      monitoring_net:
+
+  blackbox-exporter:
+    image: ${DOCKER_HUB_USERNAME}/blackbox_exporter:latest
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    networks:
+      monitoring_net:
+        
+
+  
+
+#Volumes
+volumes:
+  post_db:
+  prometheus_data:
+  
+#Networks
+networks:
+  front_net:
+  back_net:
+  monitoring_net:
+
+            
+

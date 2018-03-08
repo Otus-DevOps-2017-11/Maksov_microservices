@@ -1,0 +1,7 @@
+FROM scratch
+
+
+WORKDIR /postsrc
+COPY . /postsrc
+
+CMD ["/postsrc/hello"]
