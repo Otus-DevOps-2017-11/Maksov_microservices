@@ -1,0 +1,20 @@
+global:
+  slack_api_url: 'https://hooks.slack.com/services/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'
+  smtp_from: 'maksovotus@gmail.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'maksovotus@gmail.com'
+  smtp_auth_identity: 'maksovotus@gmail.com'
+  smtp_auth_password: 'secret'
+
+route:
+  receiver: 'notifications'
+
+
+receivers:
+  - name: 'notifications'
+    slack_configs:
+    - channel: '#maks-ovchinnikov'
+    email_configs:
+    - to: 'classic12@mail.ru'
+  
+

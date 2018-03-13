@@ -1,0 +1,111 @@
+version: '3.3'
+
+#Sevices
+services:
+
+  prometheus:
+    image: ${DOCKER_HUB_USERNAME}/prometheus:latest
+    ports:
+     - '9090:9090'
+    volumes:
+     - prometheus_data:/prometheus
+    command:
+     - '--config.file=/etc/prometheus/prometheus.yml'
+     - '--storage.tsdb.path=/prometheus'
+     - '--storage.tsdb.retention=1d'
+    networks:
+      monitoring_net:
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+    networks:
+      monitoring_net:
+
+  mongodb-exporter:
+    image: eses/mongodb_exporter:latest
+    command: ["-mongodb.uri", "post_db"]
+    networks:
+      monitoring_net:
+
+  blackbox-exporter:
+    image: ${DOCKER_HUB_USERNAME}/blackbox_exporter:latest
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    networks:
+      monitoring_net:
+
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
+    networks:
+      monitoring_net:
+
+  grafana:
+    image: ${DOCKER_HUB_USERNAME}/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    networks:
+      monitoring_net:
+  
+  alertmanager:
+   image: ${DOCKER_HUB_USERNAME}/alertmanager:latest
+   command:
+    - '--config.file=/etc/alertmanager/config.yml'
+   ports:
+    - 9093:9093
+   networks:
+    monitoring_net:
+  
+  stackdriver:
+    image: frodenas/stackdriver-exporter:latest
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/docker-193409.json
+      - STACKDRIVER_EXPORTER_GOOGLE_PROJECT_ID=docker-193409
+      - STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=compute.googleapis.com/instance/cpu,compute.googleapis.com/instance/disk,compute.googleapis.com/instance/network
+      - STACKDRIVER_EXPORTER_WEB_LISTEN_ADDRESS=stackdriver:9255
+    volumes:
+      - '/tmp/docker-193409.json:/tmp/docker-193409.json'
+    networks:
+      monitoring_net:
+
+#Volumes
+volumes:
+  prometheus_data:
+  grafana_data:
+  
+#Networks
+networks:
+  monitoring_net:
+    external: true
+
+
+
+
+
+
+
+
+
+
+
+
+
