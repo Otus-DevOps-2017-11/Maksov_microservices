@@ -848,6 +848,234 @@ blackbox-exporter:
 
 Сделан простейший топорный Makefile. К сожелению не хватает опыта.  Так кончено идеи есть что-нибудь униварсальное сделать. По типу указать директории по котрым должен проходить считывать список директорий (имена образов), а затем билдить образы.
 
+## HW23 Введение в мониторинг. Системы мониторинга.
+
+#### Подготовка окружения
+
+```
+export GOOGLE_PROJECT=_ваш_проект_
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+vm1
+
+eval $(docker-machine env vm1)
+
+docker-machine ip vm1
+```
+
+#### cAdvisor
+
+```
+services:
+...
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
+```
+#### Визуализация метрик
+```
+docker-compose -f docker-compose-monitoring.yml up -d grafana
+```
+
+#### Дашборды
+
+Мониторинг работы приложения
+
+```
+scrape_configs:
+...
+ - job_name: 'post'
+   static_configs:
+    - targets:
+    - 'post:5000'
+
+```
+
+```
+Запрос перцентиля
+rate(ui_request_count{http_status=~"^[45].*"}[1m])
+```
+
+95-й перцентиль
+```
+histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m]) by (le)))
+```
+
+Бизнес метрики
+
+```
+rate(post_count[1h])
+rate(comment_count[1h])
+
+```
+
+
+Alertmanager:
+
+```
+services:
+...
+alertmanager:
+  image: ${USER_NAME}/alertmanager
+  command:
+    - '--config.file=/etc/alertmanager/config.yml'
+  ports:
+    - 9090:9093
+```
+
+Alerts.yml
+
+```
+groups:
+  - name: alert.rules
+    rules:
+    - alert: InstanceDown
+      expr: up
+      for: 1m
+      labels:
+        severiity: page
+      annotations:
+        description: '{{ $labels.instance }} of job {{ $ $labels.job }} has been down for more than 1 minute'
+        summary: 'Instance {{ $labels.instance }} down'
+```
+
+
+#### Задание со * Отдача Docker метрик в Prometheus
+
+На Docker Host скопирован файл с настройкой 
+{
+
+  "metrics-addr": "0.0.0.0:9323",
+  "experimental": true
+
+}
+
+#### Задание со * Алерты
+
+```
+groups:
+ - name: alert.rules
+   rules:
+   - alert: InstanceDown
+     expr: up == 0
+     for: 1m
+     labels:
+      severity: page
+     annotations:
+      descriptions: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute'
+      summary: 'Instance {{ $labels.instance }} down'
+   - alert: UIResponseHigh
+     expr: histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m])) by (le)) > 0.5
+     for: 1m
+     annotations:
+      descriptions: 'UI service takes long http responses'
+      summary: 'High response time of UI service'
+   - alert: DBLatency
+     expr: histogram_quantile(0.95, sum(rate(post_read_db_seconds_bucket[5m])) by (le)) > 0.5
+     for: 1m
+     annotations:
+      descriptions: '{{ $labels.instance }} has high latency from db'
+      summary: 'High latency of db request on {{ $labels.instance }}'
+```
+
+
+#### Задание со * Интеграция Alertmanager
+
+```
+global:
+  slack_api_url: 'https://hooks.slack.com/services/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'
+  smtp_from: 'maksovotus@gmail.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'maksovotus@gmail.com'
+  smtp_auth_identity: 'maksovotus@gmail.com'
+  smtp_auth_password: 'secret'
+
+route:
+  receiver: 'notifications'
+
+
+receivers:
+  - name: 'notifications'
+    slack_configs:
+    - channel: '#maks-ovchinnikov'
+    email_configs:
+    - to: 'classic12@mail.ru'
+```
+
+#### Задание со * Автоматическое добавление в Grafana
+
+Собираем образ с datasources и dashboards
+
+Добавим пременную окружения DS_PROMETHEUS_SERVER чтоб подтянулись дашборды
+
+
+
+#### Задание со * Реализуйте сбор метрик
+
+Реализован VOUTE_COUNT
+
+Можно еще бы время пребывания на странице (неплохая метрика). Но с ruby не знаком
+
+```
+<script language="JavaScript">
+<!--//
+startday = new Date();
+clockStart = startday.getTime();
+
+function initStopwatch() { 
+var myTime = new Date();         
+var timeNow = myTime.getTime();          
+var timeDiff = timeNow - clockStart;         
+this.diffSecs = timeDiff/1000;         
+return(this.diffSecs); } 
+
+function getSecs() {        
+var mySecs = initStopwatch();         
+var mySecs1 = ""+mySecs;         
+mySecs1= mySecs1.substring(0,mySecs1.indexOf(".")) + " сек.";         
+document.forms[0].timespent.value = mySecs1         
+window.setTimeout('getSecs()',1000); }
+// -->
+</script>
+```
+
+#### Задание со * Сбор со Stackdriver
+
+
+Сбор метрик стандартный по инструкции + network
+
+```
+  stackdriver:
+    image: frodenas/stackdriver-exporter:latest
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/docker-193409.json
+      - STACKDRIVER_EXPORTER_GOOGLE_PROJECT_ID=docker-193409
+      - STACKDRIVER_EXPORTER_MONITORING_METRICS_TYPE_PREFIXES=compute.googleapis.com/instance/cpu,compute.googleapis.com/instance/disk,compute.googleapis.com/instance/network
+      - STACKDRIVER_EXPORTER_WEB_LISTEN_ADDRESS=stackdriver:9255
+    volumes:
+      - '/tmp/docker-193409.json:/tmp/docker-193409.json'
+    networks:
+      monitoring_net:
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
