@@ -22,3 +22,4 @@ RUN apk update \
  && rm -rf /root/.bundle/cache/
 
 CMD ["puma"]
+
