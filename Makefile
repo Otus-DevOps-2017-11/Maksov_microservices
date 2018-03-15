@@ -61,9 +61,3 @@ start:
 
 stop:
 	cd docker && docker-compose down
-
-
-
-
-
-
