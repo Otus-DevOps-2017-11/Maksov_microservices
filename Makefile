@@ -3,7 +3,7 @@ VERSION ?= latest
 DIR_MICROSERCVICES ?= src
 DIR_MONITORING ?= monitoring
 
-.PHONY: build-all build-comment build-post build-prometheus build-blackbox-exporter push-ui push-comment push-post push-prometheus push-blackbox-exporter push-all start stop
+.PHONY: build-all build-comment build-post build-prometheus build-blackbox-exporter buidl-grafana push-grafana push-ui push-comment push-post push-prometheus push-blackbox-exporter push-all start stop
 
 build-comment:
 	cd src/comment && bash docker_build.sh
@@ -22,8 +22,10 @@ build-prometheus:
 build-blackbox-exporter:
 	docker build -t $(USER_NAME)/blackbox_exporter:$(VERSION) monitoring/blackbox
 
+build-grafana:
+	docker build -t $(USER_NAME)/grafana:$(VERSION) monitoring/grafana
 
-build-all: build-comment build-post build-ui build-prometheus build-blackbox-exporter
+build-all: build-comment build-post build-ui build-prometheus build-blackbox-exporter build-grafana
 	
 
 push-ui:
@@ -46,6 +48,10 @@ push-blackbox-exporter:
 	docker push $(USER_NAME)/blackbox_exporter:$(VERSION)
 
 
+push-grafana:
+	docker push $(USER_NAME)/grafana:$(VERSION)
+
+
 push-all: push-ui push-comment push-post push-proemtheus push-blackbox-exporter
 
 
@@ -55,9 +61,3 @@ start:
 
 stop:
 	cd docker && docker-compose down
-
-
-
-
-
-
